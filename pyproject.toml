@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hrtf-crossfeed"
+version = "1.0.0"
+description = "Complex HRTF-derived mid-safe virtual-speaker crossfeed matrix builder"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+readme = "README.md"
+authors = [
+    {name = "EVOERAM"},
+]
+keywords = ["hrtf", "crossfeed", "sofa", "headphone", "dsp", "audio"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: Multimedia :: Sound/Audio :: Sound Synthesis",
+]
+
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.7",
+    "soundfile>=0.10",
+    "netCDF4>=1.5",
+]
+
+[project.scripts]
+hrtf-crossfeed = "hrtf_crossfeed.cli:main"
+
+[project.urls]
+"Homepage" = "https://github.com/evoeram/hrtf-crossfeed"
+"Repository" = "https://github.com/evoeram/hrtf-crossfeed"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
