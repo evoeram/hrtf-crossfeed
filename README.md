@@ -1,5 +1,7 @@
 # hrtf-crossfeed
 
+![HRTF Crossfeed Builder](HRTF-Crossfeed-Builder.png)
+
 Построение **complex HRTF-derived, mid-safe virtual-speaker crossfeed** матриц из SOFA HRTF/DTF файлов.
 
 ## Что делает
