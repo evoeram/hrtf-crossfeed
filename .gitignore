@@ -25,7 +25,5 @@ env/
 Thumbs.db
 
 # Output files
-out/
-*.wav
-*.csv
-*_meta.json
+/out/
+.pytest_cache/

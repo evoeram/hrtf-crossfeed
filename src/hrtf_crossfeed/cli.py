@@ -183,6 +183,12 @@ def main():
         help="Do not save frequency-response CSV files",
     )
 
+    ap.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress progress output",
+    )
+
     args = ap.parse_args()
 
     strengths = parse_strengths(args.strengths)
@@ -209,6 +215,7 @@ def main():
         hf_blend_end_hz=args.hf_blend_end,
         remap=args.remap,
         no_csv=args.no_csv,
+        verbose=not args.quiet,
     )
 
 

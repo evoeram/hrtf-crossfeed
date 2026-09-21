@@ -2,18 +2,22 @@
 
 import numpy as np
 
-from hrtf_crossfeed.utils import db, undb, wrap_deg, tail_fade, rms, ensure_len
-from hrtf_crossfeed.itd import woodworth_itd_seconds, validate_or_replace_itd
 from hrtf_crossfeed.io import remap_matrix
-from hrtf_crossfeed.smoothing import limit_complex_magnitude, smooth_log_magnitude_octave
+from hrtf_crossfeed.itd import validate_or_replace_itd, woodworth_itd_seconds
 from hrtf_crossfeed.pipeline import parse_strengths, strength_token
+from hrtf_crossfeed.smoothing import (
+    limit_complex_magnitude,
+    smooth_log_magnitude_octave,
+)
+from hrtf_crossfeed.utils import db, ensure_len, rms, tail_fade, undb, wrap_deg
 
 
 def test_db_undb_roundtrip():
     """dB → undb должен давать исходное значение."""
     x = np.array([0.1, 1.0, 10.0, 100.0])
     recovered = undb(db(x))
-    assert np.allclose(recovered, x, rtol=1e-12), f"Roundtrip failed: {recovered} vs {x}"
+    assert np.allclose(recovered, x, rtol=1e-12), \
+        f"Roundtrip failed: {recovered} vs {x}"
 
 
 def test_wrap_deg():
@@ -124,6 +128,16 @@ def test_smooth_log_magnitude_octave_disabled():
 def test_parse_strengths():
     assert parse_strengths("0.70,1.00,1.20") == [0.70, 1.00, 1.20]
     assert parse_strengths("1.0") == [1.0]
+
+
+def test_parse_strengths_empty_tokens():
+    assert parse_strengths("1.0,,2.0") == [1.0, 2.0]
+
+
+def test_parse_strengths_nan_raises():
+    import pytest
+    with pytest.raises(ValueError, match="not finite"):
+        parse_strengths("nan")
 
 
 def test_strength_token():

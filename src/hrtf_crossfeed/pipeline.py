@@ -1,12 +1,17 @@
 """Высокоуровневый пайплайн: связывает side_response → matrix → io."""
 
 import json
+import logging
 import warnings
 from pathlib import Path
+
+import numpy as np
 
 from .io import remap_matrix, save_frequency_csv, save_llrr
 from .matrix import build_midsafe_matrix_from_side
 from .side_response import build_target_side_response
+
+logger = logging.getLogger(__name__)
 
 
 def parse_strengths(text):
@@ -17,8 +22,17 @@ def parse_strengths(text):
     for token in text.split(","):
         token = token.strip()
 
-        if token:
-            values.append(float(token))
+        if not token:
+            continue
+
+        value = float(token)
+
+        if not np.isfinite(value):
+            raise ValueError(
+                f"Invalid strength value: {token!r} (not finite)"
+            )
+
+        values.append(value)
 
     if not values:
         raise ValueError("Strength list is empty")
@@ -241,35 +255,32 @@ def run_pipeline(
         output_meta["outputs"].append(output_entry)
 
         if verbose:
-            print()
-            print(f"Saved: {wav_path}")
+            logger.info("")
+            logger.info("Saved: %s", wav_path)
 
             if csv_path is not None:
-                print(f"CSV:   {csv_path}")
+                logger.info("CSV:   %s", csv_path)
 
-            print(
-                "  strength:                 "
-                f"{strength:.3f}"
+            logger.info("  strength:                 %.3f", strength)
+            logger.info(
+                "  latency:                  %.3f ms",
+                matrix_meta['latency_ms'],
             )
-            print(
-                "  latency:                  "
-                f"{matrix_meta['latency_ms']:.3f} ms"
+            logger.info(
+                "  omitted FIR energy:       %.1f dB",
+                matrix_meta['omitted_circular_energy_db'],
             )
-            print(
-                "  omitted FIR energy:       "
-                f"{matrix_meta['omitted_circular_energy_db']:.1f} dB"
+            logger.info(
+                "  max matrix gain:          %+.2f dB",
+                matrix_meta['max_matrix_frequency_gain_db'],
             )
-            print(
-                "  max matrix gain:          "
-                f"{matrix_meta['max_matrix_frequency_gain_db']:+.2f} dB"
+            logger.info(
+                "  recommended preamp:       %+.2f dB",
+                matrix_meta['recommended_preamp_db'],
             )
-            print(
-                "  recommended preamp:       "
-                f"{matrix_meta['recommended_preamp_db']:+.2f} dB"
-            )
-            print(
-                "  numerical Mid error:      "
-                f"{matrix_meta['mid_error_max_linear']:.3e}"
+            logger.info(
+                "  numerical Mid error:      %.3e",
+                matrix_meta['mid_error_max_linear'],
             )
 
     meta_path = Path(f"{out_prefix}_df_midsafe_meta.json")
@@ -285,13 +296,13 @@ def run_pipeline(
     )
 
     if verbose:
-        print()
-        print(f"Metadata: {meta_path}")
-        print()
-        print("Expected convolution channel order: LL, LR, RL, RR")
-        print(
-            "All filters contain an intentional common delay of "
-            f"{latency_samples} samples."
+        logger.info("")
+        logger.info("Metadata: %s", meta_path)
+        logger.info("")
+        logger.info("Expected convolution channel order: LL, LR, RL, RR")
+        logger.info(
+            "All filters contain an intentional common delay of %d samples.",
+            latency_samples,
         )
 
     return output_meta

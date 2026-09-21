@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HRTF Crossfeed Builder</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f1117;--card:#1a1d27;--border:#2a2e3a;--fg:#e4e6eb;--muted:#8b8fa3;--accent:#6c8aff;--accent2:#4ec9b0;--warn:#f0a868;--err:#f06868;--ok:#4ec9b0}
+body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.5;padding:20px}
+h1{font-size:1.5rem;margin-bottom:4px}
+h2{font-size:1.1rem;margin:16px 0 8px;color:var(--muted)}
+.subtitle{color:var(--muted);font-size:.85rem;margin-bottom:20px}
+.container{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:380px 1fr;gap:20px}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
+.form-group input,.form-group select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--fg);font-size:.85rem}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent)}
+.form-row{display:flex;gap:12px}
+.form-row .form-group{flex:1}
+.form-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.upload-area{border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s}
+.upload-area:hover{border-color:var(--accent)}
+.upload-area.dragover{border-color:var(--accent2);background:rgba(78,201,176,.05)}
+.upload-area.has-file{border-style:solid;border-color:var(--ok)}
+.upload-area .icon{font-size:2rem;margin-bottom:8px}
+.upload-area .text{color:var(--muted);font-size:.85rem}
+.upload-area .filename{color:var(--fg);font-size:.85rem;margin-top:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border:none;border-radius:8px;font-size:.85rem;cursor:pointer;transition:opacity .2s}
+.btn-primary{background:var(--accent);color:#fff;width:100%}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{background:var(--border);color:var(--fg);padding:6px 14px;font-size:.8rem}
+.btn-secondary:hover{opacity:.8}
+.file-info{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:.8rem}
+.file-info .row{display:flex;justify-content:space-between;padding:2px 0}
+.file-info .row .key{color:var(--muted)}
+.results{display:flex;flex-direction:column;gap:16px}
+.result-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.result-card.active{border-color:var(--accent)}
+.result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.result-title{font-size:.95rem;font-weight:600}
+.result-actions{display:flex;gap:8px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.metric{background:var(--bg);border-radius:6px;padding:8px 10px}
+.metric .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.metric .value{font-size:.95rem;font-weight:600}
+.metric .value.ok{color:var(--ok)}
+.metric .value.warn{color:var(--warn)}
+.chart-container{background:var(--bg);border-radius:8px;padding:12px;height:300px;position:relative}
+.chart-container canvas{max-height:280px}
+.warnings{background:rgba(240,168,104,.08);border:1px solid rgba(240,168,104,.3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:.8rem;color:var(--warn)}
+.error-msg{background:rgba(240,104,104,.08);border:1px solid rgba(240,104,104,.3);border-radius:8px;padding:12px;color:var(--err);margin-bottom:12px;font-size:.85rem}
+.loading-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,17,23,.7);z-index:999;align-items:center;justify-content:center}
+.loading-overlay.active{display:flex}
+.spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+.tabs{display:flex;gap:4px;margin-bottom:12px}
+.tab{padding:6px 14px;border:1px solid var(--border);border-radius:6px 6px 0 0;cursor:pointer;font-size:.8rem;color:var(--muted)}
+.tab.active{color:var(--fg);border-color:var(--accent);border-bottom-color:var(--card)}
+.tab:hover{color:var(--fg)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .icon{font-size:3rem;opacity:.3;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:900px){.container{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>HRTF Crossfeed Builder</h1>
+<p class="subtitle">Complex HRTF-derived mid-safe virtual-speaker crossfeed matrix</p>
+
+<div class="container">
+  <!-- LEFT: Controls -->
+  <div>
+    <div class="panel">
+      <!-- Upload -->
+      <div class="upload-area" id="uploadArea">
+        <div class="icon">📁</div>
+        <div class="text">Перетащите SOFA-файл или нажмите</div>
+        <div class="filename" id="filename"></div>
+        <input type="file" id="fileInput" accept=".sofa" style="display:none">
+      </div>
+
+      <!-- File info -->
+      <div id="fileInfo" style="display:none">
+        <div class="file-info" id="fileInfoBox"></div>
+      </div>
+
+      <!-- Error -->
+      <div id="uploadError"></div>
+
+      <h2>Параметры колонок</h2>
+      <div class="form-grid2">
+        <div class="form-group">
+          <label>Azimuth (°)</label>
+          <input type="number" id="az" value="30" step="1" min="0" max="180">
+        </div>
+        <div class="form-group">
+          <label>Elevation (°)</label>
+          <input type="number" id="el" value="0" step="1">
+        </div>
+      </div>
+
+      <h2>FIR параметры</h2>
+      <div class="form-grid3">
+        <div class="form-group">
+          <label>IR length</label>
+          <input type="number" id="irLen" value="512" step="16" min="32">
+        </div>
+        <div class="form-group">
+          <label>Analysis len</label>
+          <input type="number" id="analysisIrLen" value="512" step="16" min="32">
+        </div>
+        <div class="form-group">
+          <label>Latency</label>
+          <input type="number" id="latency" value="128" step="1" min="0">
+        </div>
+      </div>
+      <div class="form-grid3">
+        <div class="form-group">
+          <label>Pre</label>
+          <input type="number" id="pre" value="12" step="1" min="0">
+        </div>
+        <div class="form-group">
+          <label>N-FFT</label>
+          <input type="number" id="nFft" value="8192" step="256" min="256">
+        </div>
+        <div class="form-group">
+          <label>Tail frac</label>
+          <input type="number" id="tailFrac" value="0.15" step="0.05" min="0" max="0.5">
+        </div>
+      </div>
+
+      <h2>Crossfeed</h2>
+      <div class="form-group">
+        <label>Strengths (через запятую)</label>
+        <input type="text" id="strengths" value="0.70,1.00,1.20">
+      </div>
+      <div class="form-grid2">
+        <div class="form-group">
+          <label>Ear order</label>
+          <select id="earOrder">
+            <option value="auto">auto</option>
+            <option value="normal">normal</option>
+            <option value="swapped">swapped</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ITD mode</label>
+          <select id="itdMode">
+            <option value="auto">auto</option>
+            <option value="measured">measured</option>
+            <option value="woodworth">woodworth</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-group">
+          <label>Remap</label>
+          <select id="remap">
+            <option value="normal">normal</option>
+            <option value="swap_inputs">swap_inputs</option>
+            <option value="swap_outputs">swap_outputs</option>
+            <option value="swap_both">swap_both</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Smooth octave</label>
+          <input type="number" id="smoothOctave" value="12" step="1" min="0">
+        </div>
+      </div>
+
+      <h2>Дополнительно</h2>
+      <div class="form-grid3">
+        <div class="form-group">
+          <label>Max side gain (dB)</label>
+          <input type="number" id="maxSideGain" value="6" step="1">
+        </div>
+        <div class="form-group">
+          <label>HF blend start</label>
+          <input type="number" id="hfStart" value="3500" step="100">
+        </div>
+        <div class="form-group">
+          <label>HF blend end</label>
+          <input type="number" id="hfEnd" value="9000" step="500">
+        </div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-group">
+          <label>Onset thresh (dB)</label>
+          <input type="number" id="onsetThresh" value="-24" step="1">
+        </div>
+        <div class="form-group">
+          <label>Regulariz (dB)</label>
+          <input type="number" id="regularization" value="-40" step="1">
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" id="generateBtn" disabled>Сгенерировать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div>
+    <div id="resultsArea">
+      <div class="empty-state">
+        <div class="icon">📊</div>
+        <div>Загрузите SOFA-файл и сгенерируйте кроссфид-матрицу</div>
+        <div style="font-size:.8rem;margin-top:8px">Результаты: WAV, графики АЧХ, метрики</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading">
+  <div style="text-align:center">
+    <div class="spinner"></div>
+    <div style="margin-top:16px;color:var(--muted)">Обработка...</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let session = null;
+let charts = {};
+
+// ── Upload ──────────────────────────────────────────────────
+const uploadArea = $('uploadArea');
+const fileInput = $('fileInput');
+
+uploadArea.addEventListener('click', () => fileInput.click());
+
+uploadArea.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function showError(msg) {
+  $('uploadError').innerHTML = `<div class="error-msg">${msg}</div>`;
+}
+function clearError() {
+  $('uploadError').innerHTML = '';
+}
+
+async function handleFile(file) {
+  clearError();
+  $('filename').textContent = file.name;
+  uploadArea.classList.add('has-file');
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  $('loading').classList.add('active');
+  try {
+    const resp = await fetch('/api/upload', {method:'POST', body:fd});
+    const data = await resp.json();
+    if (data.error) {
+      showError(data.error);
+      uploadArea.classList.remove('has-file');
+      $('filename').textContent = '';
+      session = null;
+      $('generateBtn').disabled = true;
+      return;
+    }
+    session = data;
+    showFileInfo(data);
+    $('generateBtn').disabled = false;
+  } catch(e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    $('loading').classList.remove('active');
+  }
+}
+
+function showFileInfo(d) {
+  const rows = [
+    ['Filename', d.filename],
+    ['Sample rate', d.fs.toLocaleString() + ' Hz'],
+    ['Measurements', d.n_measurements],
+    ['Ears', d.n_ears],
+    ['IR samples', d.n_samples],
+    ['Conventions', d.sofa_conventions],
+    ['Database', d.database_name],
+    ['Listener', d.listener],
+    ['Data type', d.data_type],
+    ['Room', d.room_type],
+    ['Azimuth range', `${d.azimuth_min}° … ${d.azimuth_max}°`],
+  ].filter(r => r[1] !== '' && r[1] !== undefined && r[1] !== null);
+
+  $('fileInfoBox').innerHTML = rows.map(r =>
+    `<div class="row"><span class="key">${r[0]}</span><span>${r[1]}</span></div>`
+  ).join('');
+  $('fileInfo').style.display = 'block';
+}
+
+// ── Generate ────────────────────────────────────────────────
+$('generateBtn').addEventListener('click', async () => {
+  if (!session) return;
+  $('loading').classList.add('active');
+
+  const params = {
+    session_id: session.session_id,
+    az: parseFloat($('az').value),
+    el: parseFloat($('el').value),
+    analysis_ir_len: parseInt($('analysisIrLen').value),
+    ir_len: parseInt($('irLen').value),
+    pre: parseInt($('pre').value),
+    n_fft: parseInt($('nFft').value),
+    latency_samples: parseInt($('latency').value),
+    onset_threshold_db: parseFloat($('onsetThresh').value),
+    regularization_db: parseFloat($('regularization').value),
+    smooth_octave: parseFloat($('smoothOctave').value),
+    max_side_gain_db: parseFloat($('maxSideGain').value),
+    ear_order: $('earOrder').value,
+    itd_mode: $('itdMode').value,
+    hf_blend_start_hz: parseFloat($('hfStart').value),
+    hf_blend_end_hz: parseFloat($('hfEnd').value),
+    tail_fraction: parseFloat($('tailFrac').value),
+    strengths: $('strengths').value,
+    remap: $('remap').value,
+  };
+
+  try {
+    const resp = await fetch('/api/generate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(params),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      showError(data.error);
+      return;
+    }
+    clearError();
+    renderResults(data);
+  } catch(e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    $('loading').classList.remove('active');
+  }
+});
+
+function renderResults(data) {
+  const area = $('resultsArea');
+
+  let html = '';
+
+  if (data.warnings && data.warnings.length) {
+    html += `<div class="warnings">
+      <b>Предупреждения:</b><br>
+      ${data.warnings.map(w => '• ' + w).join('<br>')}
+    </div>`;
+  }
+
+  html += `<div class="panel" style="margin-bottom:16px;padding:10px 16px;font-size:.8rem;color:var(--muted)">
+    Channel order: <b style="color:var(--fg)">${data.channel_order.join(', ')}</b> ·
+    FS: <b style="color:var(--fg)">${data.fs.toLocaleString()} Hz</b> ·
+    Matrix: Mid = delayed identity, Side = (Hipsi-Hcontra)/(Hipsi+Hcontra)
+  </div>`;
+
+  data.outputs.forEach((out, i) => {
+    const cls = i === 0 ? 'result-card active' : 'result-card';
+    html += `<div class="${cls}" id="card-${i}">
+      <div class="result-header">
+        <div class="result-title">Strength ${out.strength.toFixed(2)}</div>
+        <div class="result-actions">
+          <a class="btn btn-secondary" href="/api/download/${data.session_id}/${out.wav_filename}">⬇ WAV</a>
+          ${out.csv_filename ? `<a class="btn btn-secondary" href="/api/download/${data.session_id}/${out.csv_filename}">⬇ CSV</a>` : ''}
+          <a class="btn btn-secondary" href="/api/download/${data.session_id}/${data.meta_filename}">⬇ JSON</a>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="label">Latency</div><div class="value">${out.latency_ms.toFixed(2)} ms</div></div>
+        <div class="metric"><div class="label">Omitted energy</div><div class="value ${out.omitted_energy_db < -30 ? 'ok' : 'warn'}">${out.omitted_energy_db.toFixed(1)} dB</div></div>
+        <div class="metric"><div class="label">Max gain</div><div class="value">${out.max_gain_db.toFixed(2)} dB</div></div>
+        <div class="metric"><div class="label">Peak gain</div><div class="value">${out.actual_peak_gain_db.toFixed(2)} dB</div></div>
+        <div class="metric"><div class="label">Preamp</div><div class="value">${out.recommended_preamp_db.toFixed(2)} dB</div></div>
+        <div class="metric"><div class="label">Mid error</div><div class="value ${out.mid_error < 1e-8 ? 'ok' : 'warn'}">${out.mid_error.toExponential(1)}</div></div>
+        <div class="metric"><div class="label">Side min</div><div class="value">${out.side_gain_min_db.toFixed(2)} dB</div></div>
+        <div class="metric"><div class="label">Side max</div><div class="value">${out.side_gain_max_db.toFixed(2)} dB</div></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" data-card="${i}" data-tab="side">Side response</div>
+        <div class="tab" data-card="${i}" data-tab="hrtf">HRTF</div>
+        <div class="tab" data-card="${i}" data-tab="phase">Phase</div>
+      </div>
+      <div class="chart-container"><canvas id="chart-${i}"></canvas></div>
+    </div>`;
+  });
+
+  area.innerHTML = html;
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const cardIdx = parseInt(tab.dataset.card);
+      const tabName = tab.dataset.tab;
+      const card = document.querySelector(`#card-${cardIdx}`);
+      card.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      loadChart(data, cardIdx, tabName);
+    });
+  });
+
+  // Load initial chart for each card
+  data.outputs.forEach((_, i) => loadChart(data, i, 'side'));
+}
+
+async function loadChart(data, cardIdx, tabName) {
+  const out = data.outputs[cardIdx];
+  if (!out.csv_filename) return;
+
+  const canvas = $(`chart-${cardIdx}`);
+  if (!canvas) return;
+
+  try {
+    const resp = await fetch(`/api/csv/${data.session_id}/${out.csv_filename}`);
+    const csv = await resp.json();
+
+    const ctx = canvas.getContext('2d');
+    const chartId = `chart-${cardIdx}`;
+
+    if (charts[chartId]) charts[chartId].destroy();
+
+    const colors = {
+      ipsi: '#6c8aff',
+      contra: '#4ec9b0',
+      target: '#f0a868',
+      actual: '#f06868',
+      mid: '#a78bfa',
+    };
+
+    const datasets = [];
+
+    if (tabName === 'side') {
+      datasets.push(
+        {label:'Target Side (dB)', data:csv.frequency.map((f,j)=>({x:f,y:csv.target_side_db[j]})), borderColor:colors.target, borderWidth:2, pointRadius:0},
+        {label:'Actual Side (dB)', data:csv.frequency.map((f,j)=>({x:f,y:csv.actual_side_db[j]})), borderColor:colors.actual, borderWidth:1.5, pointRadius:0, borderDash:[4,3]},
+      );
+    } else if (tabName === 'hrtf') {
+      datasets.push(
+        {label:'Ipsilateral (dB)', data:csv.frequency.map((f,j)=>({x:f,y:csv.ipsi_db[j]})), borderColor:colors.ipsi, borderWidth:2, pointRadius:0},
+        {label:'Contralateral (dB)', data:csv.frequency.map((f,j)=>({x:f,y:csv.contra_db[j]})), borderColor:colors.contra, borderWidth:2, pointRadius:0},
+        {label:'Actual Mid (dB)', data:csv.frequency.map((f,j)=>({x:f,y:csv.actual_mid_db[j]})), borderColor:colors.mid, borderWidth:1.5, pointRadius:0, borderDash:[4,3]},
+        {label:'Actual Side raw (dB)', data:csv.frequency.map((f,j)=>({x:f,y:csv.actual_side_raw_db[j]})), borderColor:colors.target, borderWidth:1, pointRadius:0, borderDash:[2,2]},
+      );
+    } else if (tabName === 'phase') {
+      datasets.push(
+        {label:'Target Side phase (rad)', data:csv.frequency.map((f,j)=>({x:f,y:csv.target_side_phase[j]})), borderColor:colors.target, borderWidth:2, pointRadius:0},
+        {label:'Actual Side phase (rad)', data:csv.frequency.map((f,j)=>({x:f,y:csv.actual_side_phase[j]})), borderColor:colors.actual, borderWidth:1.5, pointRadius:0, borderDash:[4,3]},
+      );
+    }
+
+    charts[chartId] = new Chart(ctx, {
+      type: 'line',
+      data: {datasets},
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: {
+            type: 'logarithmic',
+            title: {display:true, text:'Frequency (Hz)', color:'#8b8fa3'},
+            ticks: {color:'#8b8fa3', font:{size:10}},
+            grid: {color:'#2a2e3a'},
+          },
+          y: {
+            type: 'linear',
+            title: {display:true, text: tabName === 'phase' ? 'Phase (rad)' : 'dB', color:'#8b8fa3'},
+            ticks: {color:'#8b8fa3', font:{size:10}},
+            grid: {color:'#2a2e3a'},
+          },
+        },
+        plugins: {
+          legend: {labels:{color:'#e4e6eb', font:{size:11}}},
+          tooltip: {
+            backgroundColor:'#1a1d27',
+            titleColor:'#e4e6eb',
+            bodyColor:'#e4e6eb',
+            borderColor:'#2a2e3a',
+            borderWidth:1,
+          },
+        },
+      },
+    });
+  } catch(e) {
+    console.error('Chart error:', e);
+  }
+}
+</script>
+</body>
+</html>

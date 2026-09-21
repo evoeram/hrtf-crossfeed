@@ -1,5 +1,6 @@
 """Чтение HRTF/DTF данных из SOFA (netCDF4) файлов."""
 
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -41,11 +42,21 @@ def load_sofa(path):
             raise ValueError("SOFA file has no Data.SamplingRate variable")
 
         if "SourcePosition" not in ds.variables:
-            raise ValueError("SOFA file has no SourcePosition variable")
+            if "ListenerPosition" in ds.variables:
+                warnings.warn(
+                    "SOFA file has no SourcePosition; "
+                    "falling back to ListenerPosition"
+                )
+                src_var = ds.variables["ListenerPosition"]
+            else:
+                raise ValueError(
+                    "SOFA file has no SourcePosition or ListenerPosition variable"
+                )
+        else:
+            src_var = ds.variables["SourcePosition"]
 
         ir_var = ds.variables["Data.IR"]
         sr_var = ds.variables["Data.SamplingRate"]
-        src_var = ds.variables["SourcePosition"]
 
         ir = np.asarray(ir_var[:], dtype=np.float64)
         sr_all = np.asarray(sr_var[:], dtype=np.float64).reshape(-1)

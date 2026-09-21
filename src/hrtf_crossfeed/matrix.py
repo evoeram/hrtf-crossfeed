@@ -145,6 +145,10 @@ def build_midsafe_matrix_from_side(
         20.0 * np.log10(max(max_matrix_gain, EPS)),
     )
 
+    actual_peak_gain_db = float(
+        20.0 * np.log10(max(max_matrix_gain, EPS))
+    )
+
     meta = {
         "strength": float(strength),
         "latency_samples": int(latency_samples),
@@ -167,6 +171,7 @@ def build_midsafe_matrix_from_side(
         "recommended_preamp_db": float(
             recommended_preamp_db
         ),
+        "actual_peak_gain_db": actual_peak_gain_db,
         "actual_side_gain_min_db": float(
             np.min(db(R_actual))
         ),

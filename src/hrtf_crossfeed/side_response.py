@@ -5,10 +5,10 @@ import numpy as np
 from .delay import get_delay_seconds
 from .ear_order import determine_ear_map
 from .geometry import nearest_source_index, source_positions_to_unit_vectors
+from .itd import validate_or_replace_itd
 from .onset import extract_onset_aligned, onset_index
 from .smoothing import limit_complex_magnitude, smooth_log_magnitude_octave
 from .sofa import load_sofa
-from .itd import validate_or_replace_itd
 from .utils import EPS, db
 
 

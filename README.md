@@ -35,7 +35,7 @@ python -m hrtf_crossfeed \
 ### Программно
 
 ```python
-from hrtf_crossfeed.pipeline import run_pipeline
+from hrtf_crossfeed import run_pipeline
 
 meta = run_pipeline(
     sofa_path="input.sofa",
@@ -90,3 +90,22 @@ meta = run_pipeline(
 ## Лицензия
 
 MIT
+
+## Web-интерфейс
+
+Веб-UI для интерактивной генерации кроссфид-матриц с графиками АЧХ:
+
+```bash
+hrtf-crossfeed-web
+# или
+python -m hrtf_crossfeed.web
+```
+
+Откроется на `http://127.0.0.1:5173`.
+
+Возможности:
+- Загрузка SOFA-файла (drag & drop)
+- Настройка всех параметров (azimuth, FIR, crossfeed, smoothing, HF blend)
+- Графики АЧХ: Side response, HRTF, Phase (Chart.js, log-frequency)
+- Метрики: latency, omitted energy, mid error, peak gain, recommended preamp
+- Скачивание WAV, CSV, JSON

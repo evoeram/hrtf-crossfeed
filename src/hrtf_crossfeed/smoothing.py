@@ -50,19 +50,12 @@ def smooth_log_magnitude_octave(H, freqs, fraction=0.0):
     fwhm_oct = 1.0 / float(fraction)
     sigma = fwhm_oct / 2.354820045
 
-    smoothed = np.empty_like(lm)
+    # Векторизованное сглаживание: матрица весов Гаусса в log-frequency domain.
+    dx = x[:, None] - x[None, :]
+    weights = np.exp(-0.5 * (dx / sigma) ** 2)
+    weights /= weights.sum(axis=1, keepdims=True)
 
-    for i, xi in enumerate(x):
-        radius = 3.0 * sigma
-
-        lo = np.searchsorted(x, xi - radius, side="left")
-        hi = np.searchsorted(x, xi + radius, side="right")
-
-        dx = x[lo:hi] - xi
-        weights = np.exp(-0.5 * (dx / sigma) ** 2)
-        weights /= np.sum(weights)
-
-        smoothed[i] = np.sum(weights * lm[lo:hi])
+    smoothed = weights @ lm
 
     new_mag = mag.copy()
     new_mag[positive] = np.exp(smoothed)

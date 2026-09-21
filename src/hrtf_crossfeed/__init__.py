@@ -27,7 +27,7 @@ hrtf-crossfeed
 ---------------
 .. code-block:: python
 
-    from hrtf_crossfeed.pipeline import run_pipeline
+    from hrtf_crossfeed import run_pipeline
 
     meta = run_pipeline(
         sofa_path="input.sofa",
@@ -54,7 +54,17 @@ hrtf-crossfeed
 
 __version__ = "1.0.0"
 
+from .matrix import build_midsafe_matrix_from_side
+from .pipeline import parse_strengths, run_pipeline, strength_token
+from .side_response import build_target_side_response
+
 __all__ = [
+    "__version__",
+    "run_pipeline",
+    "parse_strengths",
+    "strength_token",
+    "build_midsafe_matrix_from_side",
+    "build_target_side_response",
     "utils",
     "sofa",
     "geometry",
@@ -68,4 +78,5 @@ __all__ = [
     "io",
     "pipeline",
     "cli",
+    "web",
 ]

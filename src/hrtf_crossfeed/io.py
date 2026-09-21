@@ -119,4 +119,5 @@ def save_frequency_csv(
         delimiter=",",
         header=header,
         comments="",
+        fmt="%.10g",
     )
